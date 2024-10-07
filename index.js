@@ -1,8 +1,6 @@
 const express = require('express');
 const axios = require('axios');
 const helmet = require('helmet');
-const puppeteer = require('puppeteer-core');
-
 const app = express();
 const port = 3000;
 
@@ -10,6 +8,10 @@ const CLOUDFLARE_API_KEY = 'jR_QLJkhgWLtCJsMRFHUtnMIoQzSO4PNyJ_AwiWZ';
 const CLOUDFLARE_ZONE_ID = '4de7cfa4c579eba6a1bc257bf61b9c6e';
 
 const blocklist = new Set();
+const proxyHeaders = [
+    'x-forwarded-for', 'via', 'x-real-ip', 'forwarded', 
+    'x-client-ip', 'x-forwarded', 'proxy-connection', 'x-proxy-id', 'x-surrogate-id'
+];
 
 const verifyCloudflareToken = async () => {
     try {
@@ -46,45 +48,58 @@ const blockIPCloudflare = async (ip) => {
 const isBannedIP = (ip) => blocklist.has(ip);
 
 const detectAndBanIP = (req, res, next) => {
-    // Extract IP from x-forwarded-for or fallback to req.connection.remoteAddress
     const ip = req.headers['x-forwarded-for'] 
         ? req.headers['x-forwarded-for'].split(',')[0].trim()
         : req.connection.remoteAddress;
 
     if (isBannedIP(ip)) {
-        return res.status(403).send('hina ng DDoS mo bata HAHAHAHA');
+        return res.status(403).send('Access Denied.');
     }
 
-    if (req.headers['x-forwarded-for']) {
-        const proxies = req.headers['x-forwarded-for'].split(',');
-        proxies.forEach((proxy) => {
-            blocklist.add(proxy.trim());
-            blockIPCloudflare(proxy.trim());
-        });
-    }
+    proxyHeaders.forEach(header => {
+        if (req.headers[header]) {
+            blocklist.add(ip);
+            blockIPCloudflare(ip);
+            return res.status(403).send('Proxy usage detected. Access Denied.');
+        }
+    });
 
     blocklist.add(ip);
     blockIPCloudflare(ip);
-    res.status(403).send('hina ng DDoS mo bata HAHAHAHA');
+    next();
 };
 
-const usePuppeteerToSimulateUser = async () => {
-    const browser = await puppeteer.launch({
-        headless: true,
+const securityMiddleware = (req, res, next) => {
+    const userAgent = req.headers['user-agent'];
+    if (!userAgent || userAgent.includes('curl') || userAgent.includes('wget')) {
+        return res.status(403).send('Access Denied.');
+    }
+
+    if (['GET', 'POST'].indexOf(req.method) === -1) {
+        return res.status(405).send('Method Not Allowed');
+    }
+
+    const blockedHeaders = ['origin', 'referer'];
+    blockedHeaders.forEach(header => {
+        if (req.headers[header]) {
+            return res.status(403).send('Access Denied.');
+        }
     });
 
-    const page = await browser.newPage();
-    await page.goto('https://anti-ddos.onrender.com/'); 
-    await browser.close();
+    if (req.headers['content-length'] > 10000) {
+        return res.status(413).send('Payload Too Large');
+    }
+
+    next();
 };
 
 app.use(helmet());
 app.use(express.json());
+app.use(securityMiddleware);
 app.use(detectAndBanIP);
 
-app.get('/', async (req, res) => {
-    await usePuppeteerToSimulateUser();
-    res.send('hina ng DDoS mo bata HAHAHAHA');
+app.get('/', (req, res) => {
+    res.send('Secure API');
 });
 
 app.use((req, res) => {
@@ -94,7 +109,7 @@ app.use((req, res) => {
 app.listen(port, async () => {
     const isCloudflareTokenValid = await verifyCloudflareToken();
     if (!isCloudflareTokenValid) {
-        console.error('Invalid Cloudflare API key. DDoS protection might not work.');
+        console.error('Invalid Cloudflare API key.');
     }
     console.log(`API running on port ${port}`);
 });

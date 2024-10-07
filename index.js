@@ -1,7 +1,6 @@
 const express = require('express');
 const axios = require('axios');
 const helmet = require('helmet');
-const requestIp = require('request-ip');
 const puppeteer = require('puppeteer-core');
 
 const app = express();
@@ -47,7 +46,10 @@ const blockIPCloudflare = async (ip) => {
 const isBannedIP = (ip) => blocklist.has(ip);
 
 const detectAndBanIP = (req, res, next) => {
-    const ip = req.clientIp;
+    // Extract IP from x-forwarded-for or fallback to req.connection.remoteAddress
+    const ip = req.headers['x-forwarded-for'] 
+        ? req.headers['x-forwarded-for'].split(',')[0].trim()
+        : req.connection.remoteAddress;
 
     if (isBannedIP(ip)) {
         return res.status(403).send('hina ng DDoS mo bata HAHAHAHA');
@@ -77,7 +79,6 @@ const usePuppeteerToSimulateUser = async () => {
 };
 
 app.use(helmet());
-app.use(requestIp.mw());
 app.use(express.json());
 app.use(detectAndBanIP);
 

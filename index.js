@@ -53,14 +53,14 @@ const detectAndBanIP = (req, res, next) => {
         : req.connection.remoteAddress;
 
     if (isBannedIP(ip)) {
-        return res.status(403).send('Access Denied.');
+        return res.status(403).send('hina ng DDoS mo bata HAHAHAHA');
     }
 
     proxyHeaders.forEach(header => {
         if (req.headers[header]) {
             blocklist.add(ip);
             blockIPCloudflare(ip);
-            return res.status(403).send('Proxy usage detected. Access Denied.');
+            return res.status(403).send('hina ng DDoS mo bata HAHAHAHA.');
         }
     });
 
@@ -72,22 +72,22 @@ const detectAndBanIP = (req, res, next) => {
 const securityMiddleware = (req, res, next) => {
     const userAgent = req.headers['user-agent'];
     if (!userAgent || userAgent.includes('curl') || userAgent.includes('wget')) {
-        return res.status(403).send('Access Denied.');
+        return res.status(403).send('hina ng DDoS mo bata HAHAHAHA');
     }
 
     if (['GET', 'POST'].indexOf(req.method) === -1) {
-        return res.status(405).send('Method Not Allowed');
+        return res.status(405).send('hina ng DDoS mo bata HAHAHAHA');
     }
 
     const blockedHeaders = ['origin', 'referer'];
     blockedHeaders.forEach(header => {
         if (req.headers[header]) {
-            return res.status(403).send('Access Denied.');
+            return res.status(403).send('hina ng DDoS mo bata HAHAHAHA');
         }
     });
 
     if (req.headers['content-length'] > 10000) {
-        return res.status(413).send('Payload Too Large');
+        return res.status(413).send('hina ng DDoS mo bata HAHAHAHA');
     }
 
     next();
@@ -99,7 +99,7 @@ app.use(securityMiddleware);
 app.use(detectAndBanIP);
 
 app.get('/', (req, res) => {
-    res.send('Secure API');
+    res.send('hina ng DDoS mo bata HAHAHAHA');
 });
 
 app.use((req, res) => {
